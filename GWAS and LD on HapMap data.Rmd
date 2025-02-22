@@ -1,0 +1,165 @@
+---
+title: "GWAS and LD on HapMap data"
+author: "Mohanad Hussein"
+date: "2025-02-16"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## OBJECTIVE
+
+This project aims to illustrate an example of how GWAS is manually performed in R using data from HapMap project. Although this is a part of the Computational Bio-medicine graduate course at the University of Göttingen, to me, this projects is a long-waited as I have conducted web-based GWAS analysis previously, which as expected, did not add much to the theoretical understanding of Genome Wide Association Studies and Linkage Disequilibrium. Therefore, I have put some effort in documenting the analysis by explaining the context behind running GWAS and LD analysis.
+
+## LIBRARIES AND INPUT DATA
+
+Packages used in this analysis are **snpMatrix** and **snpStats**. The first is integrates in the second and implements an S4 class to efficiently handle large SNP data while the latter provides statistical methods for analyzing SNP data. The tool recommends installing **hexbin** that enhances plotting options for GWAs convenience and provides hexagonla bin plots.
+The data used in this analysis was retrieved from the HapMap project of which a 1000 samples, varying between cases (1) and controls (0), where selected for this study. Note worthy point is that the HapMap project targeted SNPs that have a Minor Allele Frequency (MAF) > 0.05 (5%). Each sample is genotyped for 28501 SNPs. 
+The main input is formatted in the form of a matrix where rows are samples, columns are SNPs and values are numeric codes referring to one of the three alleles (A,B or AB). 
+The input also requires two additional elements in addition to the genotype matrix. An element containing condition information (i.e case/control) and sup-population information about samples. The other element contains the chromosomal position of the SNP and the nucleotide base for each of its alleles. Note that this analysis is dedicated for chromosome 10 only.
+
+```{r, message = FALSE, warning = FALSE}
+
+library(snpStats)
+library(hexbin)
+
+# loading data, alternatively can be done using load("snps_10.dat")
+data(for.exercise)
+
+# inspect the SNP matrix and save the SNP matrix itself
+summary(snps.10)
+show(snps.10)
+genotype_matrix = snps.10@.Data
+
+```
+
+## EXPLORATORY DATA ANALYSIS
+
+To have a general overview on the data, we view the head of each dataframe and summarize the data. The matrix is of a special class (snpMatrix), so we select only two entries with two SNPs to look at. After that, we look into the other two input data.
+
+The row and col summary functions compute some summary statistics for the input matrix. *row.summary* calculates **call rates** and **heterozygosity** for each sample while *col.names* calculates the ratio of each of the three alleles per sample in addition to the Z statistics of Herdy-Weinberg Equilibrium (Z.HWE). The Z.HWE value is a measue of how far the observed genotype frequency is from the distribution under HWE principle. A Z.HWE score closer to zero indicates that observed genotype frequencies are close to what would have been expected under HWE. Values away from zero (in either direction) marks significant deviation from HWE due to evolutionary events. 
+
+```{r, message = FALSE, warning = FALSE}
+
+# inspect the SNP matrix
+summary(snps.10)
+
+# inspect SNP support object, info about each snp
+head(snp.support)
+summary(snp.support)
+
+# inspect subject/sample support object, info about samples, case/ctrl and sub-pop
+head(subject.support)
+summary(subject.support)
+
+```
+
+To understand how the data is distributed, we plot the distribution of MAF "summarizing" columns in Genotype matrix. MAF is calculated by dividing the Minor Allele Count by the total alleles at that position (2N). 
+The second plot show the distribution of Z scores for each SNP under HWE principal. We see that Z scores are mostly close to zero but there is a clear deviation from the HWE principal as the distribution is not symmetric.  
+
+```{r, message = FALSE, warning = FALSE}
+
+sample_sum = row.summary(snps.10)
+snp_sum = col.summary(snps.10)
+
+hist(snp_sum$MAF)
+hist(snp_sum$z.HWE)
+
+```
+
+Next, we plot a correlogram to see the correlation between variables of the summary stat, namely call rates, certain calls and heterozygosity. An outlier sample appears to have a near-zero value in the Heteroztygosity column. Since Loss Of Heterozygosity is a sign of inbreeding and can hide the signal of actually causal variants.
+
+```{r, message = FALSE, warning = FALSE}
+
+plot(sample_sum)
+
+```
+
+After the correlogram, we plot two other hexagonal binning plots to check difference of call rates in contrls vs samples, and also check their MAF differences.
+
+```{r, message = FALSE, warning = FALSE}
+
+# compare call rates across condition ctrl/case
+cases = subject.support$cc == 1
+controls = subject.support$cc == 0
+
+# recompute the genotype column for cases and 
+cases_sum = col.summary(snps.10[cases,])
+controls_sum = col.summary(snps.10[controls,])
+
+# visualize call rates in hexagonal bin plot
+hb = hexbin(controls_sum$Call.rate, cases_sum$Call.rate, xbin = 50) # create the hexbin object
+sp = plot(hb) # plot the hexbin object
+hexVP.abline(sp$plot.vp, 0, 1, col="black") # add slope
+
+# visualize allele frequencies in hexagonal bin plot
+sp = plot(hexbin(controls_sum$MAF, cases_sum$MAF, xbin = 50))
+hexVP.abline(sp$plot.vp, 0,1, col = "white")
+
+```
+
+
+## GWAS ANALYSIS
+
+Some Qc steps are recommended in literature, some of them are [here](https://pmc.ncbi.nlm.nih.gov/articles/PMC6001694/table/mpr1608-tbl-0001/)
+
+The logic of GWAS is to screen thousands of SNPs to find correlation with a trait -cases in this example- using Cochran-Armitage test. We have, for each SNP, chi-squared tests on 1 (additive model of minor allele effect) and 2 (no assumption about allele) degrees of freedom (df), together with N, the number of subjects for whom data were available. The 2 df test is the conventional Pearsonian test for the 3 × 2 contingency table. The large number of NA values for the latter test reflects the fact that, for these SNPs, the minor allele frequency was such that one homozygous genotype did not occur in the data.
+
+Some filtering needs to be done on the GWAS results; we consider taking only SNPs with MAF value of higher than 1% in the population. Additionally, we also would like to restrict our analysis to samples that are under HWE principle and thus filter out those ridiculously out of HWE. 
+
+We filter the GWAS results for the mentioned criteria and store the positions of the filtered SNPs to use in creating Manhattan plot.
+
+```{r, message = FALSE, warning = FALSE}
+
+# run GWAS
+tests = single.snp.tests(cc, data = subject.support, snp.data = snps.10)
+use2 = snp_sum$MAF > 0.01 & snp_sum$z.HWE^2 < 200
+tests = tests[use2]
+positions = snp.support[use2, "position"]
+
+```
+
+Another way to look into the significance of SNPs is the QQ plot (not so relevant here)
+
+So far, this is broad view of SNPs that are in input data that is used to run GWAS. However, we usually would like to account for population structure. This can be done by defining a factor of strata in the subject support object. This requires rerunning GWAS steps and  
+
+## LINKAGE DISEQUILIBRIUM
+
+Two genomic positions are said to be in Linkage Disequilibrium (LD) if their segregation occurred dependent of each other. In other words, they segregated together. There are different metrics to quantify LD, of which we choose D.prime and R.squared. The first measures presence of LD between SNPs (i.e how much do two SNPs appear together in samples) which infers recombination. The latter measures how strong the correlation between SNPs is. This measure is illustrated in what is called LD plot; showing 1 as black and 0 as white.
+
+```{r, message = FALSE, warning = FALSE}
+
+data(ld.example)
+
+# run LD with two calculation methods
+snps.10_LD = ld(snps.10, stats = c("D.prime", "R.squared"), depth = 100)
+
+# plot LD plots for both metrics
+image(snps.10_LD$D.prime[1:500,1:500], lwd = 0)
+image(snps.10_LD$R.squared[1:500, 1:500], lwd = 0)
+
+```
+
+
+
+## COMBINATION OF GWAS WITH LD ANALYSIS
+
+Each of the two analysis on its own provides comprehension for an underlying genomic context. However, despite the statistical power of GWAS, it doesn't pinpoint the causal SNP/s in a disease. Here comes the rule of LD; when given a set of SNPs that are significantly correlated to a trait, we can highlight which of these SNPs fall in LD region and also quantify it's strength. A region with high LD is more likely to contain haplotypes that are passed on to disease carriers. Yet not enough to definitively determine a causal variant, it provides us with a relatively narrow genomic range of SNPs to direct for fine mapping. Such a narrow region can be visaulized as follows. 
+
+```{r, message = FALSE, warning = FALSE}
+
+# puplishing ready plot of narrow LD region of 200 SNPs selected upon checking higher GWAS hits' positions
+spectrum <- rainbow(10, start=0, end=1/6)[10:1]
+image(snps.10_LD$D.prime[75:274,75:274], lwd=0, cuts=9, col.regions=spectrum, colorkey=TRUE)
+
+```
+
+## DATA AVAILABILITY
+
+This analysis is part of the Computational Bio-medicine course at the University of Göttingen and relies heavily on the documentation provided by the used R packages. Raw code and data files are available on my Github: [https://github.com/mohanadhussein/GWAS_LD_analysis](https://github.com/mohanadhussein/GWAS_LD_analysis)
