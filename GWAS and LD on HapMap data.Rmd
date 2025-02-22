@@ -2,11 +2,7 @@
 title: "GWAS and LD on HapMap data"
 author: "Mohanad Hussein"
 date: "2025-02-16"
-output: 
-  html_document:
-    toc: true
-    toc_float: true
-    code_folding: hide
+output: rmarkdown::github_document
 ---
 
 ```{r setup, include=FALSE}

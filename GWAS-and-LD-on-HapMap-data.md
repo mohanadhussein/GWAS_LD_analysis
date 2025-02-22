@@ -12,7 +12,7 @@ Göttingen, to me, this projects is a long-waited as I have conducted
 web-based GWAS analysis previously, which as expected, did not add much
 to the theoretical understanding of Genome Wide Association Studies and
 Linkage Disequilibrium. Therefore, I have put some effort in documenting
-the analysis by explaining the context behinf running GWAS and LD
+the analysis by explaining the context behind running GWAS and LD
 analysis.
 
 ## LIBRARIES AND INPUT DATA
@@ -27,7 +27,7 @@ retrieved from the HapMap project of which a 1000 samples, varying
 between cases (1) and controls (0), where selected for this study. Note
 worthy point is that the HapMap project targeted SNPs that have a Minor
 Allele Frequency (MAF) \> 0.05 (5%). Each sample is genotyped for 28501
-SNP. The main input is formatted in the form of a matrix where rows are
+SNPs. The main input is formatted in the form of a matrix where rows are
 samples, columns are SNPs and values are numeric codes referring to one
 of the three alleles (A,B or AB). The input also requires two additional
 elements in addition to the genotype matrix. An element containing
