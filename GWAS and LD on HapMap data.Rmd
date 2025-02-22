@@ -2,6 +2,7 @@
 title: "GWAS and LD on HapMap data"
 author: "Mohanad Hussein"
 date: "2025-02-16"
+self-contained: true
 output: rmarkdown::github_document
 ---
 

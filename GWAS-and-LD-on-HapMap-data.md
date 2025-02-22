@@ -3,7 +3,7 @@ GWAS and LD on HapMap data
 Mohanad Hussein
 2025-02-16
 
-## OBJECTIVE
+## OBJECTIVES
 
 This project aims to illustrate an example of how GWAS is manually
 performed in R using data from HapMap project. Although this is a part
