@@ -2,15 +2,15 @@
 title: "GWAS and LD on HapMap data"
 author: "Mohanad Hussein"
 date: "2025-02-16"
-self-contained: true
-output: rmarkdown::github_document
+#self-contained: true
+output: github_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## OBJECTIVE
+## OBJECTIVES
 
 This project aims to illustrate an example of how GWAS is manually performed in R using data from HapMap project. Although this is a part of the Computational Bio-medicine graduate course at the University of Göttingen, to me, this projects is a long-waited as I have conducted web-based GWAS analysis previously, which as expected, did not add much to the theoretical understanding of Genome Wide Association Studies and Linkage Disequilibrium. Therefore, I have put some effort in documenting the analysis by explaining the context behind running GWAS and LD analysis.
 
